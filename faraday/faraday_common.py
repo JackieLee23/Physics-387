@@ -113,15 +113,74 @@ class minEyeTransmission:
     
 
 
-
-    
-
-
-class findRanges:
+class zeroFieldMalus:
     def __init__(self, measurements):
         self.measurements = measurements
-        self.headings = measurements.columns
-        self.valueRanges = self.valueRanges(self.measurements, self.headings)
+
+        ranges = findRanges(self.measurements)
+        self.valueRanges = ranges.valueRanges
+        self.keyVals = self.sampleFilterKeyList(self.valueRanges)
+        self.BvsIntensityZeroField = self.BvsIntensityZeroField(self.measurements, self.keyVals)
+
+
+    
+    def sampleFilterKeyList(self, ranges): #this will create a dictionary of keys in our returned dictionary that will have the structure of: "{Sample}_{Filter}" for each key and store as a tuple (Sample, filter)
+        
+        sample = "Sample (cm)" #Presumed names of sample and filter data in directory
+        filter = "Filter"
+
+        
+        sampleFilterKeys = {} #Dict of keys
+
+        samples = ranges[sample] #Grabbing the unique sample and filter values
+        filters = ranges[filter]
+
+        for s in samples:
+            for f in filters:
+                sampleFilterKeys[f"{s}_{f}"] = (s,f)
+        
+        return sampleFilterKeys 
+    
+    def SFIsolate(self, measurements, keyVal): #Gives me a dataframe of measurements of a particular {Sample}_{Filter} combination
+        sample = "Sample (cm)" #Presumed headings of data in df
+        filter = "Filter"
+
+        df = measurements[(measurements[sample] == keyVal[0]) & (measurements[filter] == keyVal[1])]
+        
+        return df
+    
+    def BvsIntensityZeroField(self, measurements, keyVals): # a dictionary: {key = "{sample}_{filter}", value =  list of 3 numpy arrays: magfieldcurrents, intensities, associated zeroAngleFields}
+        sample = "Sample (cm)" #Presumed headings of data in df
+        filter = "Filter"
+        zeroFieldAngle = "Zero Field Angle"
+        intensity = "Intensity"
+        magFieldCurrent = "Magnetic Field Current (Amps)"
+
+
+        BIDict = {}
+
+        for key, keyVal in keyVals.items():
+    
+            df = self.SFIsolate(measurements, keyVal) #Isolate the key's associated filter/sample pair in a df
+
+            magFieldCurrents = df[magFieldCurrent].to_numpy() #get the magFieldCurrents of filter/sample pair
+            intensities = df[intensity].to_numpy() #get the intensities of filter/sample pair
+            zeroFieldAngles = df[zeroFieldAngle].to_numpy() #get the zero field angles of filter/sample pair
+
+            BIDict[key] = [magFieldCurrents, intensities, zeroFieldAngles]
+
+        return BIDict
+
+
+            
+
+
+
+class findRanges: #Finds the different, unique values in the measurements dataframe
+    def __init__(self, measurements):
+        self.measurements = measurements
+        self.headings = measurements.columns #The identifiers
+        self.valueRanges = self.valueRanges(self.measurements, self.headings) # a dictionary: {key = heading name from self.headings, value = different unique values for heading}
     
     def valueRanges(self, measurements, headings):
         valueRanges = {}
@@ -137,4 +196,4 @@ Testing data below, make sure to comment out when using Jupyter
 # data_file = 'data/faraday_data.xlsx'
 # full_df = pd.read_excel(data_file)
 
-# minEyeTransmission(full_df)
+# zeroFieldMalus(full_df)
