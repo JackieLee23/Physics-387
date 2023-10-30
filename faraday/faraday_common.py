@@ -63,3 +63,78 @@ class MalusFit:
         ax.set_title(f"{self.observation.mag_field_volt} V," 
                      f"{self.observation.filter},"
                      f"{self.observation.sample}")
+        
+class minEyeTransmission:
+    def __init__(self, measurements):
+        self.measurements = measurements
+
+        valRanges = findRanges(measurements)
+        self.ranges = valRanges.valueRanges
+        self.keyVals = self.sampleFilterKeyList(self.ranges)
+        self.transmissionAnglesVersusBField = self.angleVsB(self.measurements, self.keyVals)
+        
+
+    def sampleFilterKeyList(self, ranges): #this will create a dictionary of keys in our returned dictionary that will have the structure of: "{Sample}_{Filter}" for each key and store as a tuple (Sample, filter)
+        
+        sample = "Sample (cm)" #Presumed names of sample and filter data in directory
+        filter = "Filter"
+
+        
+        sampleFilterKeys = {} #Dict of keys
+
+        samples = ranges[sample] #Grabbing the unique sample and filter values
+        filters = ranges[filter]
+
+        for s in samples:
+            for f in filters:
+                sampleFilterKeys[f"{s}_{f}"] = (s,f)
+        
+        return sampleFilterKeys
+
+
+# popt, pcov = curve_fit(f, x, y) # your data x, y to fit
+    
+    def angleVsB(self, measurements, keyVals): #Creates a dictionary with values of transmission angle versus B field for all sample/filter combinations
+                                                #Returns dictionary: {key = "{sample}+{filter}", val = [angleVals, BFieldVals]} for all sample/filter permutations
+        sample = "Sample (cm)" #Presumed headings of data in df
+        filter = "Filter"
+        magField = "Magnetic Field Current (Amps)"
+        angle = "Min transmission angle"
+
+        angleVsB = {} #Angles versus magnetic field for all values
+
+        for key, values in keyVals.items(): #Iterating over each sample/filter permutation
+            magneticFieldVals =  measurements[(measurements[sample] == values[0]) & (measurements[filter] == values[1])][magField].to_numpy() #Collects B field values for permutation
+            angleVals = measurements[(measurements[sample] == values[0]) & (measurements[filter] == values[1])][angle].to_numpy() #Collects transmission angle values for permutation
+
+            angleVsB[key] = [angleVals, magneticFieldVals]
+        
+        return angleVsB
+    
+
+
+
+    
+
+
+class findRanges:
+    def __init__(self, measurements):
+        self.measurements = measurements
+        self.headings = measurements.columns
+        self.valueRanges = self.valueRanges(self.measurements, self.headings)
+    
+    def valueRanges(self, measurements, headings):
+        valueRanges = {}
+        for heading in headings:
+            repetitions = measurements[heading].duplicated(keep = "first")
+            valueRanges[heading] = measurements[~repetitions][heading].to_numpy()
+        return valueRanges
+"""
+Testing data below, make sure to comment out when using Jupyter
+"""
+
+
+# data_file = 'data/faraday_data.xlsx'
+# full_df = pd.read_excel(data_file)
+
+# minEyeTransmission(full_df)
