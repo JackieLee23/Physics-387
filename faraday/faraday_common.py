@@ -23,6 +23,7 @@ class Observation:
         self.angles = angles
         self.intensities = intensities
 
+
 class MalusFit:
     def __init__(self, observation):
         self.observation = observation
@@ -119,13 +120,17 @@ class minEyeTransmission:
 
 
 class zeroFieldMalus:
-    def __init__(self, measurements):
+    def __init__(self, measurements, mList, b, m):
+        self.b = b
+        self.m = m
         self.measurements = measurements
+        self.mList = mList
 
         ranges = findRanges(self.measurements)
         self.valueRanges = ranges.valueRanges
         self.keyVals = self.sampleFilterKeyList(self.valueRanges)
-        self.BvsIntensityZeroField = self.BvsIntensityZeroField(self.measurements, self.keyVals)
+        self.BvsIntensityZeroField = self.BvsIntensityZeroField(self.measurements, self.keyVals, self.mList, self.m, self.b)
+        
 
 
     
@@ -153,8 +158,23 @@ class zeroFieldMalus:
         df = measurements[(measurements[sample] == keyVal[0]) & (measurements[filter] == keyVal[1])]
         
         return df
+    def rotationAngle(self, V, m1, m2, m3): #Formula for a single rotation angle given m_i fitting parameters and a magnetic field dependent voltage. Note that V here is a scalar, rotation angle handles arrays
+        
+        phi = np.rad2deg(np.arccos(np.sqrt((m1-V)/m2)))+m3
+        return phi
     
-    def BvsIntensityZeroField(self, measurements, keyVals): # a dictionary: {key = "{sample}_{filter}", value =  list of 3 numpy arrays: magfieldcurrents, intensities, associated zeroAngleFields}
+    def rotationAngles(self, Vs, m1, m2, m3):
+        phis = []
+        
+        for V in Vs:
+            phis.append(self.rotationAngle(V, m1, m2, m3))
+        
+        return np.array(phis)
+
+    def magneticFieldVals(self, current, m, b):
+        return np.add(np.multiply(m,current), b)
+
+    def BvsIntensityZeroField(self, measurements, keyVals, mList, m, b): # a dictionary: {key = "{sample}_{filter}", value =  list of 3 numpy arrays: magfieldcurrents, intensities, associated zeroAngleFields}
         sample = "Sample (cm)" #Presumed headings of data in df
         filter = "Filter"
         zeroFieldAngle = "Zero Field Angle"
@@ -165,16 +185,29 @@ class zeroFieldMalus:
         BIDict = {}
 
         for key, keyVal in keyVals.items():
-    
+            m1 = mList[key]["m1"]
+            m2 = mList[key]["m2"]
+            m3 = mList[key]["m3"]
+
             df = self.SFIsolate(measurements, keyVal) #Isolate the key's associated filter/sample pair in a df
 
             magFieldCurrents = df[magFieldCurrent].to_numpy() #get the magFieldCurrents of filter/sample pair
             intensities = df[intensity].to_numpy() #get the intensities of filter/sample pair
             zeroFieldAngles = df[zeroFieldAngle].to_numpy() #get the zero field angles of filter/sample pair
+            phis = self.rotationAngles(intensities, m1, m2, m3)
+            magneticFieldVals = self.magneticFieldVals(magFieldCurrents, m, b)
 
-            BIDict[key] = [magFieldCurrents, intensities, zeroFieldAngles]
+
+            BIDict[key] = {"current": magFieldCurrents, 
+                           "intensities": intensities, 
+                           "zero Field angles": zeroFieldAngles,
+                           "rotation angles" : phis,
+                           "magnetic field values" : magneticFieldVals
+                           }
 
         return BIDict
+    
+    
 
 
 
@@ -240,7 +273,36 @@ class SampleAndFilter:
 
 
 
-# data_file = 'data/faraday_data.xlsx'
-# full_df = pd.read_excel(data_file)
+data_file = 'data/faraday_data.xlsx'
+full_df = pd.read_excel(data_file)
+mList = {'1.036_Red': {'m1': 0.07320082950131986,
+  'm2': 0.07242662219366228,
+  'm3': 335.274925890484},
+ '0.956_Red': {'m1': 0.07600340873265846,
+  'm2': 0.07524317421585733,
+  'm3': 338.28784039026385},
+ '1.272_Red': {'m1': 0.058755378942364996,
+  'm2': 0.05742480689139942,
+  'm3': 335.95791532842117},
+ '1.272_Blue': {'m1': 0.11509943462188175,
+  'm2': 0.11027621309592965,
+  'm3': 334.2244603785799},
+ '0.956_Blue': {'m1': 0.13607536773223358,
+  'm2': 0.12719212466437843,
+  'm3': 336.57688964189674},
+ '1.036_Blue': {'m1': 0.10586229718833813,
+  'm2': 0.10266727840879811,
+  'm3': 336.1480069830858},
+ '1.036_Yellow': {'m1': 0.07614245258643797,
+  'm2': 0.0742616330734973,
+  'm3': 335.6961290674026},
+ '0.956_Yellow': {'m1': 0.09596294707418054,
+  'm2': 0.09173222470975656,
+  'm3': 336.1317016374635},
+ '1.272_Yellow': {'m1': 0.0876601595037936,
+  'm2': 0.08466557881776582,
+  'm3': 336.54722589233563}}
+m = 190.86
+b = -0.0152
 
-# zeroFieldMalus(full_df)
+zeroFieldMalus(full_df, mList, b, m)
