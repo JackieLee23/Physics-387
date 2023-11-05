@@ -269,6 +269,45 @@ class SampleAndFilter:
         ax.set_xlabel("Magnetic Field (mT)")
         ax.set_ylabel("Angle of rotation (degrees)")
 
+class CauchyFit:
+    def __init__(self, wavelength_arr, index_arr):
+        self.wavelength_arr = wavelength_arr
+        self.index_arr = index_arr
+        self.fit()
+
+    def fit(self):
+        """
+        Fit cauchy curve to angles and intensities
+        """
+        params, covariance = curve_fit(self.cauchy_curve, 
+                                           self.wavelength_arr, 
+                                           self.index_arr)
+        self.a, self.b = params
+        
+    def cauchy_curve(self, x, a, b):
+        return a + b / x ** 2
+
+    def get_fit_params(self):
+        """
+        Get the cauchy a and b coefficients in a tuple
+        """
+        return (self.a, self.b)
+
+    def get_dispersion_derivative(self, wavelength):
+        return -2 * self.b / wavelength ** 3
+
+    def plot_fit(self, ax):
+        """
+        Plot cauchy fit to intensities, with both data and fitted curve
+        """
+        fit_wavelengths = np.linspace(np.min(self.wavelength_arr), 
+                                 np.max(self.wavelength_arr),
+                                 100)
+        fitted_indices = self.cauchy_curve(fit_wavelengths, self.a, self.b)
+        ax.plot(fit_wavelengths, fitted_indices, color = "red")
+        ax.scatter(self.wavelength_arr, self.index_arr)
+        
+
 
 
 
