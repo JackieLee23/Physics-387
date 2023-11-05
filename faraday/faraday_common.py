@@ -7,7 +7,7 @@ import os
 import math
 import collections
 
-B_ERR = 0.01
+B_ERR = 5
 A_ERR = 0.5
 
 def line(x, A, B):
@@ -263,11 +263,11 @@ class SampleAndFilter:
                     xerr = self.xerr,
                     yerr = self.yerr,
                     fmt = 'o',
-                    elinewidth = 1)
-        ax.set_title(f"{self.filter},"
-                     f"{self.sample}: "
-                     f"{np.around(self.a, 2)} +/- {np.around(self.aerr, 2)} "
-                     f"{np.around(self.b, 2)} +/- {np.around(self.berr, 2)}")
+                    elinewidth = 1,
+                    color = 'red')
+        ax.set_title(f"{self.filter}, {self.sample}: \n ({np.around(self.a, 3)} +/- {np.around(self.aerr, 3)})x + ({np.around(self.b, 3)} +/- {np.around(self.berr, 3)})", fontweight = 'bold')
+        ax.set_xlabel("Magnetic Field (mT)")
+        ax.set_ylabel("Angle of rotation (degrees)")
 
 
 
