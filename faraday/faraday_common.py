@@ -68,7 +68,10 @@ class MalusFit:
         ax.scatter(self.angles, self.intensities)
         ax.set_title(f"{self.observation.mag_field} V," 
                      f"{self.observation.filter},"
-                     f"{self.observation.sample}")
+                     f"{self.observation.sample}", fontweight = 'bold')
+
+        ax.set_xlabel("Angle of Rotation (degrees)")
+        ax.set_ylabel("Intensity (V)")
         
 class minEyeTransmission:
     def __init__(self, measurements):
@@ -172,7 +175,10 @@ class zeroFieldMalus:
         return np.array(phis)
 
     def magneticFieldVals(self, current, m, b):
-        return np.add(np.multiply(m,current), b)
+        bs = []
+        for c in current:
+            bs.append(m*c+b)
+        return np.array(bs)
 
     def BvsIntensityZeroField(self, measurements, keyVals, mList, m, b): # a dictionary: {key = "{sample}_{filter}", value =  list of 3 numpy arrays: magfieldcurrents, intensities, associated zeroAngleFields}
         sample = "Sample (cm)" #Presumed headings of data in df
@@ -273,36 +279,36 @@ class SampleAndFilter:
 
 
 
-data_file = 'data/faraday_data.xlsx'
-full_df = pd.read_excel(data_file)
-mList = {'1.036_Red': {'m1': 0.07320082950131986,
-  'm2': 0.07242662219366228,
-  'm3': 335.274925890484},
- '0.956_Red': {'m1': 0.07600340873265846,
-  'm2': 0.07524317421585733,
-  'm3': 338.28784039026385},
- '1.272_Red': {'m1': 0.058755378942364996,
-  'm2': 0.05742480689139942,
-  'm3': 335.95791532842117},
- '1.272_Blue': {'m1': 0.11509943462188175,
-  'm2': 0.11027621309592965,
-  'm3': 334.2244603785799},
- '0.956_Blue': {'m1': 0.13607536773223358,
-  'm2': 0.12719212466437843,
-  'm3': 336.57688964189674},
- '1.036_Blue': {'m1': 0.10586229718833813,
-  'm2': 0.10266727840879811,
-  'm3': 336.1480069830858},
- '1.036_Yellow': {'m1': 0.07614245258643797,
-  'm2': 0.0742616330734973,
-  'm3': 335.6961290674026},
- '0.956_Yellow': {'m1': 0.09596294707418054,
-  'm2': 0.09173222470975656,
-  'm3': 336.1317016374635},
- '1.272_Yellow': {'m1': 0.0876601595037936,
-  'm2': 0.08466557881776582,
-  'm3': 336.54722589233563}}
-m = 190.86
-b = -0.0152
+# data_file = 'data/faraday_data.xlsx'
+# full_df = pd.read_excel(data_file)
+# mList = {'1.036_Red': {'m1': 0.07320082950131986,
+#   'm2': 0.07242662219366228,
+#   'm3': 335.274925890484},
+#  '0.956_Red': {'m1': 0.07600340873265846,
+#   'm2': 0.07524317421585733,
+#   'm3': 338.28784039026385},
+#  '1.272_Red': {'m1': 0.058755378942364996,
+#   'm2': 0.05742480689139942,
+#   'm3': 335.95791532842117},
+#  '1.272_Blue': {'m1': 0.11509943462188175,
+#   'm2': 0.11027621309592965,
+#   'm3': 334.2244603785799},
+#  '0.956_Blue': {'m1': 0.13607536773223358,
+#   'm2': 0.12719212466437843,
+#   'm3': 336.57688964189674},
+#  '1.036_Blue': {'m1': 0.10586229718833813,
+#   'm2': 0.10266727840879811,
+#   'm3': 336.1480069830858},
+#  '1.036_Yellow': {'m1': 0.07614245258643797,
+#   'm2': 0.0742616330734973,
+#   'm3': 335.6961290674026},
+#  '0.956_Yellow': {'m1': 0.09596294707418054,
+#   'm2': 0.09173222470975656,
+#   'm3': 336.1317016374635},
+#  '1.272_Yellow': {'m1': 0.0876601595037936,
+#   'm2': 0.08466557881776582,
+#   'm3': 336.54722589233563}}
+# m = 190.86
+# b = -0.0152
 
-zeroFieldMalus(full_df, mList, b, m)
+# zeroFieldMalus(full_df, mList, b, m)
