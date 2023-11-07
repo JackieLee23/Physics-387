@@ -323,6 +323,8 @@ class CauchyFit:
         fitted_indices = self.cauchy_curve(fit_wavelengths, self.a, self.b)
         ax.plot(fit_wavelengths, fitted_indices, color = "red")
         ax.scatter(self.wavelength_arr, self.index_arr)
+        ax.set_xlabel("Wavelength (m)")
+        ax.set_ylabel("Index of refraction")
         
 
 
