@@ -7,7 +7,7 @@ import os
 import math
 import collections
 
-B_ERR = 0.01
+B_ERR = 5
 A_ERR = 0.5
 
 def line(x, A, B):
@@ -15,13 +15,15 @@ def line(x, A, B):
     
 class Observation:
     def __init__(self, mag_field, filter, sample, min_trans_eye,
-                angles, intensities):
+                angles, intensities, p3_intensity):
         self.mag_field = mag_field
         self.filter = filter
         self.sample = sample
         self.min_trans_eye = min_trans_eye
         self.angles = angles
         self.intensities = intensities
+        self.p3_intensity = p3_intensity
+
 
 class MalusFit:
     def __init__(self, observation):
@@ -52,6 +54,20 @@ class MalusFit:
         """
         return self.m3
 
+    def angle_from_voltage(self, V, negative = False):
+        """
+        Calculate angle corresponding to a voltage
+        """
+        arc_arg = np.sqrt((self.m1-V)/self.m2)
+        if arc_arg < 1:
+            if negative:
+                phi = -np.rad2deg(np.arccos(arc_arg))+self.m3
+            else:
+                phi = np.rad2deg(np.arccos(arc_arg))+self.m3
+        else:
+            phi = self.get_min_angle()
+        return phi
+
     def plot_fit(self, ax):
         """
         Plot malus fit to intensities, with both data and fitted curve
@@ -65,9 +81,11 @@ class MalusFit:
                                               self.m3)
         ax.plot(fit_angles, fitted_intensities, color = "red")
         ax.scatter(self.angles, self.intensities)
-        ax.set_title(f"{self.observation.mag_field} V," 
+        ax.set_title(f"{self.observation.mag_field} mT," 
                      f"{self.observation.filter},"
                      f"{self.observation.sample}")
+
+    
         
 class minEyeTransmission:
     def __init__(self, measurements):
@@ -119,13 +137,17 @@ class minEyeTransmission:
 
 
 class zeroFieldMalus:
-    def __init__(self, measurements):
+    def __init__(self, measurements, mList, b, m):
+        self.b = b
+        self.m = m
         self.measurements = measurements
+        self.mList = mList
 
         ranges = findRanges(self.measurements)
         self.valueRanges = ranges.valueRanges
         self.keyVals = self.sampleFilterKeyList(self.valueRanges)
-        self.BvsIntensityZeroField = self.BvsIntensityZeroField(self.measurements, self.keyVals)
+        self.BvsIntensityZeroField = self.BvsIntensityZeroField(self.measurements, self.keyVals, self.mList, self.m, self.b)
+        
 
 
     
@@ -153,8 +175,23 @@ class zeroFieldMalus:
         df = measurements[(measurements[sample] == keyVal[0]) & (measurements[filter] == keyVal[1])]
         
         return df
+    def rotationAngle(self, V, m1, m2, m3): #Formula for a single rotation angle given m_i fitting parameters and a magnetic field dependent voltage. Note that V here is a scalar, rotation angle handles arrays
+        
+        phi = np.rad2deg(np.arccos(np.sqrt((m1-V)/m2)))+m3
+        return phi
     
-    def BvsIntensityZeroField(self, measurements, keyVals): # a dictionary: {key = "{sample}_{filter}", value =  list of 3 numpy arrays: magfieldcurrents, intensities, associated zeroAngleFields}
+    def rotationAngles(self, Vs, m1, m2, m3):
+        phis = []
+        
+        for V in Vs:
+            phis.append(self.rotationAngle(V, m1, m2, m3))
+        
+        return np.array(phis)
+
+    def magneticFieldVals(self, current, m, b):
+        return np.add(np.multiply(m,current), b)
+
+    def BvsIntensityZeroField(self, measurements, keyVals, mList, m, b): # a dictionary: {key = "{sample}_{filter}", value =  list of 3 numpy arrays: magfieldcurrents, intensities, associated zeroAngleFields}
         sample = "Sample (cm)" #Presumed headings of data in df
         filter = "Filter"
         zeroFieldAngle = "Zero Field Angle"
@@ -165,16 +202,29 @@ class zeroFieldMalus:
         BIDict = {}
 
         for key, keyVal in keyVals.items():
-    
+            m1 = mList[key]["m1"]
+            m2 = mList[key]["m2"]
+            m3 = mList[key]["m3"]
+
             df = self.SFIsolate(measurements, keyVal) #Isolate the key's associated filter/sample pair in a df
 
             magFieldCurrents = df[magFieldCurrent].to_numpy() #get the magFieldCurrents of filter/sample pair
             intensities = df[intensity].to_numpy() #get the intensities of filter/sample pair
             zeroFieldAngles = df[zeroFieldAngle].to_numpy() #get the zero field angles of filter/sample pair
+            phis = self.rotationAngles(intensities, m1, m2, m3)
+            magneticFieldVals = self.magneticFieldVals(magFieldCurrents, m, b)
 
-            BIDict[key] = [magFieldCurrents, intensities, zeroFieldAngles]
+
+            BIDict[key] = {"current": magFieldCurrents, 
+                           "intensities": intensities, 
+                           "zero Field angles": zeroFieldAngles,
+                           "rotation angles" : phis,
+                           "magnetic field values" : magneticFieldVals
+                           }
 
         return BIDict
+    
+    
 
 
 
@@ -230,17 +280,87 @@ class SampleAndFilter:
                     xerr = self.xerr,
                     yerr = self.yerr,
                     fmt = 'o',
-                    elinewidth = 1)
-        ax.set_title(f"{self.filter},"
-                     f"{self.sample}: "
-                     f"{np.around(self.a, 2)} +/- {np.around(self.aerr, 2)} "
-                     f"{np.around(self.b, 2)} +/- {np.around(self.berr, 2)}")
+                    elinewidth = 1,
+                    color = 'red')
+        ax.set_title(f"{self.filter}, {self.sample}: \n ({np.around(self.a, 3)} +/- {np.around(self.aerr, 3)})x + ({np.around(self.b, 3)} +/- {np.around(self.berr, 3)})", fontweight = 'bold')
+        ax.set_xlabel("Magnetic Field (mT)")
+        ax.set_ylabel("Angle of rotation (degrees)")
+
+class CauchyFit:
+    def __init__(self, wavelength_arr, index_arr):
+        self.wavelength_arr = wavelength_arr
+        self.index_arr = index_arr
+        self.fit()
+
+    def fit(self):
+        """
+        Fit cauchy curve to angles and intensities
+        """
+        params, covariance = curve_fit(self.cauchy_curve, 
+                                           self.wavelength_arr, 
+                                           self.index_arr)
+        self.a, self.b = params
+        
+    def cauchy_curve(self, x, a, b):
+        return a + b / x ** 2
+
+    def get_fit_params(self):
+        """
+        Get the cauchy a and b coefficients in a tuple
+        """
+        return (self.a, self.b)
+
+    def get_dispersion_derivative(self, wavelength):
+        return -2 * self.b / wavelength ** 3
+
+    def plot_fit(self, ax):
+        """
+        Plot cauchy fit to intensities, with both data and fitted curve
+        """
+        fit_wavelengths = np.linspace(np.min(self.wavelength_arr), 
+                                 np.max(self.wavelength_arr),
+                                 100)
+        fitted_indices = self.cauchy_curve(fit_wavelengths, self.a, self.b)
+        ax.plot(fit_wavelengths, fitted_indices, color = "red")
+        ax.scatter(self.wavelength_arr, self.index_arr)
+        ax.set_xlabel("Wavelength (m)")
+        ax.set_ylabel("Index of refraction")
+        
 
 
 
 
 
-# data_file = 'data/faraday_data.xlsx'
-# full_df = pd.read_excel(data_file)
+data_file = 'data/faraday_data.xlsx'
+full_df = pd.read_excel(data_file)
+mList = {'1.036_Red': {'m1': 0.07320082950131986,
+  'm2': 0.07242662219366228,
+  'm3': 335.274925890484},
+ '0.956_Red': {'m1': 0.07600340873265846,
+  'm2': 0.07524317421585733,
+  'm3': 338.28784039026385},
+ '1.272_Red': {'m1': 0.058755378942364996,
+  'm2': 0.05742480689139942,
+  'm3': 335.95791532842117},
+ '1.272_Blue': {'m1': 0.11509943462188175,
+  'm2': 0.11027621309592965,
+  'm3': 334.2244603785799},
+ '0.956_Blue': {'m1': 0.13607536773223358,
+  'm2': 0.12719212466437843,
+  'm3': 336.57688964189674},
+ '1.036_Blue': {'m1': 0.10586229718833813,
+  'm2': 0.10266727840879811,
+  'm3': 336.1480069830858},
+ '1.036_Yellow': {'m1': 0.07614245258643797,
+  'm2': 0.0742616330734973,
+  'm3': 335.6961290674026},
+ '0.956_Yellow': {'m1': 0.09596294707418054,
+  'm2': 0.09173222470975656,
+  'm3': 336.1317016374635},
+ '1.272_Yellow': {'m1': 0.0876601595037936,
+  'm2': 0.08466557881776582,
+  'm3': 336.54722589233563}}
+m = 190.86
+b = -0.0152
 
-# zeroFieldMalus(full_df)
+zeroFieldMalus(full_df, mList, b, m)

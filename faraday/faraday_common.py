@@ -15,13 +15,14 @@ def line(x, A, B):
     
 class Observation:
     def __init__(self, mag_field, filter, sample, min_trans_eye,
-                angles, intensities):
+                angles, intensities, p3_intensity):
         self.mag_field = mag_field
         self.filter = filter
         self.sample = sample
         self.min_trans_eye = min_trans_eye
         self.angles = angles
         self.intensities = intensities
+        self.p3_intensity = p3_intensity
 
 
 class MalusFit:
@@ -53,6 +54,20 @@ class MalusFit:
         """
         return self.m3
 
+    def angle_from_voltage(self, V, negative = False):
+        """
+        Calculate angle corresponding to a voltage
+        """
+        arc_arg = np.sqrt((self.m1-V)/self.m2)
+        if arc_arg < 1:
+            if negative:
+                phi = -np.rad2deg(np.arccos(arc_arg))+self.m3
+            else:
+                phi = np.rad2deg(np.arccos(arc_arg))+self.m3
+        else:
+            phi = self.get_min_angle()
+        return phi
+
     def plot_fit(self, ax):
         """
         Plot malus fit to intensities, with both data and fitted curve
@@ -66,9 +81,11 @@ class MalusFit:
                                               self.m3)
         ax.plot(fit_angles, fitted_intensities, color = "red")
         ax.scatter(self.angles, self.intensities)
-        ax.set_title(f"{self.observation.mag_field} V," 
+        ax.set_title(f"{self.observation.mag_field} mT," 
                      f"{self.observation.filter},"
                      f"{self.observation.sample}")
+
+    
         
 class minEyeTransmission:
     def __init__(self, measurements):
@@ -306,6 +323,11 @@ class CauchyFit:
         fitted_indices = self.cauchy_curve(fit_wavelengths, self.a, self.b)
         ax.plot(fit_wavelengths, fitted_indices, color = "red")
         ax.scatter(self.wavelength_arr, self.index_arr)
+<<<<<<< HEAD
+=======
+        ax.set_xlabel("Wavelength (m)")
+        ax.set_ylabel("Index of refraction")
+>>>>>>> master
         
 
 
