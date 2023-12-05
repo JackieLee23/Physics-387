@@ -11,10 +11,11 @@ class AngleData:
                  sample, 
                  interface, 
                  inc_ang, 
-                 refr_ang, 
+                 refr_ang = None, 
                  refl_ang = None, 
                  trans_int = None,
-                 refl_int = None):
+                 refl_int = None,
+                 p_polarized = None):
         
         self.sample = sample
         self.interface = interface
@@ -23,6 +24,7 @@ class AngleData:
         self.refl_ang = refl_ang
         self.trans_int = trans_int
         self.refl_int = refl_int
+        self.p_polarized = p_polarized
 
     def line(self, x, a, b):
         return a * x + b
@@ -67,6 +69,88 @@ class AngleData:
         ax.set_ylabel('Sine of Refracted angle')
         ax.set_title(f'{self.sample}, {self.interface}')
         ax.legend()
+
+    def fresnel(self, inc_ang, e, p, find_transmitted = True):
+        """
+        Angles in degrees
+        p is ior ratio between incident and transmitting medium
+        """
+        inc_ang = np.deg2rad(inc_ang)
+        trans_ang = np.arcsin(np.sin(inc_ang) / p)
+        m = np.cos(trans_ang) / np.cos(inc_ang)
+
+        if self.p_polarized:
+            if find_transmitted:
+                return e * p * m * (2 / (m + p)) ** 2
+            else:
+                return e * ((m - p) / (m + p)) ** 2
+        else:
+            if find_transmitted:
+                return e * p * m * (2 / (1 + p * m))
+            else:
+                return e * ((1 - p * m) / (1 + p * m)) ** 2
+            
+    def fit_fresnel_reflected(self):
+        """
+        Fit reflection fresnel curve
+        """
+        
+        self.valid_refl_inds = np.isfinite(self.refl_int)
+        params, covariance = curve_fit(lambda x, e, p: self.fresnel(x, 
+                                                                   e, 
+                                                                   p, 
+                                                                   find_transmitted = False), 
+                                       self.inc_ang[self.valid_refl_inds], 
+                                       self.refl_int[self.valid_refl_inds],
+                                       p0 = [np.max(self.refl_int[self.valid_refl_inds]), 
+                                             1])
+        self.fresnel_refl_e, self.fresnel_refl_p = params
+
+    def fit_fresnel_transmitted(self):
+        self.valid_trans_inds = np.isfinite(self.trans_int)
+        params, covariance = curve_fit(lambda x, e, p: self.fresnel(x, 
+                                                                   e, 
+                                                                   p, 
+                                                                   find_transmitted = True), 
+                                       self.inc_ang[self.valid_trans_inds], 
+                                       self.trans_int[self.valid_trans_inds],
+                                       p0 = [np.max(self.trans_int[self.valid_trans_inds]), 
+                                             1])
+        self.fresnel_trans_e, self.fresnel_trans_p = params
+
+    def plot_fresnel_fit(self, ax):
+        self.fit_fresnel_reflected()
+        self.fit_fresnel_transmitted()
+        fit_x = np.linspace(0,
+                            90,
+                            1000)
+        ax.scatter(self.inc_ang, 
+                   self.refl_int, 
+                   label='Measured reflection intensities')
+        ax.scatter(self.inc_ang,
+                   self.trans_int,
+                   label = 'Measured transmission intensity')
+        ax.plot(fit_x, 
+                self.fresnel(fit_x, self.fresnel_refl_e, self.fresnel_refl_p, False), 
+                label='Fitted Curve', 
+                color='red')
+        ax.plot(fit_x, 
+                self.fresnel(fit_x, self.fresnel_trans_e, self.fresnel_trans_p, True), 
+                label='Fitted Curve', 
+                color='red')
+        
+        
+        ax.set_xlabel('Incident angle')
+        ax.set_ylabel('Intensity angle')
+        ax.set_title(f'{self.sample}, {self.interface}')
+
+
+
+    
+
+
+
+
 
 def invert_n(n, n_err):
     """
