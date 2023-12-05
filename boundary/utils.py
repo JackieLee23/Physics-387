@@ -15,7 +15,8 @@ class AngleData:
                  refl_ang = None, 
                  trans_int = None,
                  refl_int = None,
-                 p_polarized = None):
+                 p_polarized = None,
+                 error = None):
         
         self.sample = sample
         self.interface = interface
@@ -25,6 +26,7 @@ class AngleData:
         self.trans_int = trans_int
         self.refl_int = refl_int
         self.p_polarized = p_polarized
+        self.error = error
 
     def line(self, x, a, b):
         return a * x + b
@@ -76,6 +78,7 @@ class AngleData:
         p is ior ratio between incident and transmitting medium
         """
         inc_ang = np.deg2rad(inc_ang)
+        
         trans_ang = np.arcsin(np.sin(inc_ang) / p)
         m = np.cos(trans_ang) / np.cos(inc_ang)
 
@@ -102,8 +105,8 @@ class AngleData:
                                                                    find_transmitted = False), 
                                        self.inc_ang[self.valid_refl_inds], 
                                        self.refl_int[self.valid_refl_inds],
-                                       p0 = [np.max(self.refl_int[self.valid_refl_inds]), 
-                                             1])
+                                       p0 = [np.min(self.refl_int[self.valid_refl_inds]), 
+                                             1], maxfev=700)
         self.fresnel_refl_e, self.fresnel_refl_p = params
 
     def fit_fresnel_transmitted(self):
@@ -115,7 +118,7 @@ class AngleData:
                                        self.inc_ang[self.valid_trans_inds], 
                                        self.trans_int[self.valid_trans_inds],
                                        p0 = [np.max(self.trans_int[self.valid_trans_inds]), 
-                                             1])
+                                             1], maxfev=700)
         self.fresnel_trans_e, self.fresnel_trans_p = params
 
     def plot_fresnel_fit(self, ax):
@@ -141,7 +144,7 @@ class AngleData:
         
         
         ax.set_xlabel('Incident angle')
-        ax.set_ylabel('Intensity angle')
+        ax.set_ylabel('Fractional Intensity')
         ax.set_title(f'{self.sample}, {self.interface}')
 
 
